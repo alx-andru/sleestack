@@ -1,9 +1,10 @@
 {
     "appKeys": {},
     "capabilities": [
-        ""
+        "configurable",
+        "health"
     ],
-    "companyName": "mailtoalex86@googlemail.com",
+    "companyName": "Alex",
     "enableMultiJS": true,
     "longName": "Sleestack",
     "projectType": "native",
@@ -12,9 +13,14 @@
     },
     "sdkVersion": "3",
     "shortName": "Sleestack",
+    "targetPlatforms": [
+        "aplite",
+        "basalt",
+        "chalk"
+    ],
     "uuid": "2ee6a9e7-0638-468b-a45a-1f71be49ead6",
     "versionLabel": "1.0",
     "watchapp": {
-        "watchface": false
+        "watchface": true
     }
 }
