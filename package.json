@@ -1,0 +1,40 @@
+{
+    "author": "Alex",
+    "dependencies": {
+        "pebble-clay": "^1.0.0"
+    },
+    "keywords": [],
+    "name": "sleestack",
+    "pebble": {
+        "capabilities": [
+            "configurable",
+            "health"
+        ],
+        "displayName": "Sleestack",
+        "enableMultiJS": true,
+        "messageKeys": [
+            "COLOR_BACKGROUND",
+            "COLOR_PRIMARY",
+            "COLOR_SECONDARY",
+            "TEXT_LABEL",
+            "STRING_UTC_OFFSET",
+            "STRING_PRIMARY_FONT",
+            "STRING_SECONDARY_FONT"
+        ],
+        "projectType": "native",
+        "resources": {
+            "media": []
+        },
+        "sdkVersion": "3",
+        "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "chalk"
+        ],
+        "uuid": "8ac504eb-ac80-400c-befa-75e9a7b653b7",
+        "watchapp": {
+            "watchface": true
+        }
+    },
+    "version": "1.2.0"
+}

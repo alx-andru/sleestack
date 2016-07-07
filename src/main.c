@@ -24,15 +24,16 @@ const char *fonts[] ={
   FONT_KEY_LECO_20_BOLD_NUMBERS // 8
 };
 
-#define KEY_COLOR_BACKGROUND      0
-#define KEY_COLOR_PRIMARY         1
-#define KEY_COLOR_SECONDARY       2
+// #define MESSAGE_KEY_COLOR_BACKGROUND      0
+// #define MESSAGE_KEY_COLOR_PRIMARY         1
+// #define MESSAGE_KEY_COLOR_SECONDARY       2
 
-#define KEY_TEXT_LABEL            4
-#define KEY_STRING_UTC_OFFSET     5
+// #define MESSAGE_KEY_TEXT_LABEL            4
+// #define MESSAGE_KEY_STRING_UTC_OFFSET     5
 
-#define KEY_STRING_PRIMARY_FONT   6
-#define KEY_STRING_SECONDARY_FONT 7
+// #define MESSAGE_KEY_STRING_PRIMARY_FONT   6
+// #define MESSAGE_KEY_STRING_SECONDARY_FONT 7
+
 
 static void update_steps(){
   HealthMetric metric = HealthMetricStepCount;
@@ -47,37 +48,71 @@ static void update_steps(){
   }   
 }
 
+
+
 static void update_time() {
   time_t time_localtime = time(NULL); 
   struct tm *tm_local = localtime(&time_localtime);
+  
+  // Adjust UTC Offset - Experimental
+  struct tm *tm_adjusted = gmtime(&time_localtime);
+  
+  int32_t minutes = utc_offset_int % 60; // get left over minutes
+  int32_t hours = (utc_offset_int - minutes) / 60; // hours offset
+  
+  char *day_indicator = "      ";
+  
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "adjusted: %d minutes: %ld both: %ld",tm_adjusted->tm_min, minutes, tm_adjusted->tm_min+minutes);
+  // if minutes exceed another hour, add it
+  if(tm_adjusted->tm_min + minutes >= 60) {
+    if(tm_adjusted->tm_hour + 1 != 24){
+      tm_adjusted->tm_hour += 1;  
+    } else {
+      tm_adjusted->tm_hour = 0;
+    }
+    tm_adjusted->tm_min += minutes-60;
+  } else if(tm_adjusted-> tm_min + minutes <0) {
+    tm_adjusted->tm_min = 60 - (tm_adjusted->tm_min+minutes);
+    tm_adjusted->tm_hour -= 1;
+  } else {
+    tm_adjusted->tm_min += minutes;  
+  }
+  
+  // offset moves day back
+  if(tm_adjusted->tm_hour + hours <= 0){
+    day_indicator = "-1";
+    tm_adjusted->tm_hour += hours + 24;
+      // if minutes exceed another hour, subtract it
+      if(tm_adjusted->tm_min - minutes < 0) {
+        tm_adjusted->tm_hour -= 1;
+      }
+      tm_adjusted->tm_min = minutes - tm_adjusted->tm_min;
+    if(tm_local->tm_isdst == 1){
+      tm_adjusted->tm_hour += 1;
+    } 
+    // offset moves day forward
+  } else if(tm_adjusted->tm_hour + hours >= 24) {
+      tm_adjusted->tm_hour += hours - 24;
+    day_indicator = "+1";
+  } else {
+     tm_adjusted->tm_hour += hours;    
+  }
+  
   
   // Set time 21:44 (UTC-5)
   static char s_buff_local_time[8];
   strftime(s_buff_local_time, sizeof(s_buff_local_time), clock_is_24h_style() ? "%H:%M" : "%I:%M", tm_local);
   text_layer_set_text(s_time_layer, s_buff_local_time);
+ 
   // Set date Sat 21 May
   static char s_date_buffer[16];
   strftime(s_date_buffer, sizeof(s_date_buffer), "%a %d %b", tm_local);
   text_layer_set_text(s_date_layer, s_date_buffer);
   
-  // Adjust UTC Offset - Experimental
-  struct tm *tm_adjusted = gmtime(&time_localtime);
-  if(tm_adjusted->tm_hour + utc_offset_int <= 0){
-    if(tm_local->tm_isdst == 1){
-      tm_adjusted->tm_hour += utc_offset_int + 24 + 1;    
-    } else {
-      tm_adjusted->tm_hour += utc_offset_int + 24;    
-    }
-  } else if(tm_adjusted->tm_hour + utc_offset_int >= 24) {
-      tm_adjusted->tm_hour += utc_offset_int - 24;    
-  } else {
-   tm_adjusted->tm_hour += utc_offset_int;  
-  }
-  
   // Set utc offset time 03:44 (UTC+2 + DST)
   static char s_buff_adjusted_time[8];
   strftime(s_buff_adjusted_time, sizeof(s_buff_adjusted_time), clock_is_24h_style() ? "%H:%M" : "%I:%M", tm_adjusted);
-  text_layer_set_text(s_time_utc_offset_layer, s_buff_adjusted_time);
+  text_layer_set_text(s_time_utc_offset_layer, strcat(s_buff_adjusted_time, day_indicator));
   
   update_steps();  
 }
@@ -106,15 +141,16 @@ static void updateBackgroundColor(GColor background_color){
 
 static void updatePrimaryColor(GColor primary_color){
   text_layer_set_text_color(s_time_layer, primary_color);
-  text_layer_set_text_color(s_text_utc_offset_layer, primary_color);
-  text_layer_set_text_color(s_text_steps_layer, primary_color);
+  text_layer_set_text_color(s_battery_layer, primary_color);
+  text_layer_set_text_color(s_steps_layer, primary_color);
+  text_layer_set_text_color(s_time_utc_offset_layer, primary_color);
 }
 
 static void updateSecondaryColor(GColor secondary_color){
   text_layer_set_text_color(s_date_layer, secondary_color);
-  text_layer_set_text_color(s_time_utc_offset_layer, secondary_color);
-  text_layer_set_text_color(s_steps_layer, secondary_color);
-  text_layer_set_text_color(s_battery_layer, secondary_color);
+  text_layer_set_text_color(s_text_utc_offset_layer, secondary_color);
+  text_layer_set_text_color(s_text_steps_layer, secondary_color);
+  
 }
 
 static void updateUtcOffsetLabel(char *s_buffer){
@@ -132,42 +168,42 @@ static void updateSecondaryFont(){
 
 static void initializeConfig(){
   
-  if (persist_exists(KEY_COLOR_PRIMARY)) {
-    uint32_t primary_int = persist_read_int(KEY_COLOR_PRIMARY);
+  if (persist_exists(MESSAGE_KEY_COLOR_PRIMARY)) {
+    uint32_t primary_int = persist_read_int(MESSAGE_KEY_COLOR_PRIMARY);
     GColor primary_color = GColorFromHEX(primary_int);
     updatePrimaryColor(primary_color);
   }
   
-  if (persist_exists(KEY_COLOR_BACKGROUND)) {
-    uint32_t background_int = persist_read_int(KEY_COLOR_BACKGROUND);
+  if (persist_exists(MESSAGE_KEY_COLOR_BACKGROUND)) {
+    uint32_t background_int = persist_read_int(MESSAGE_KEY_COLOR_BACKGROUND);
     GColor background_color = GColorFromHEX(background_int);
     updateBackgroundColor(background_color);
   }
   
-  if (persist_exists(KEY_COLOR_SECONDARY)) {
-    uint32_t sc_hex = persist_read_int(KEY_COLOR_SECONDARY);
+  if (persist_exists(MESSAGE_KEY_COLOR_SECONDARY)) {
+    uint32_t sc_hex = persist_read_int(MESSAGE_KEY_COLOR_SECONDARY);
     GColor secondary_color = GColorFromHEX(sc_hex);
     updateSecondaryColor(secondary_color);
   }
   
-  if (persist_exists(KEY_TEXT_LABEL) && persist_exists(KEY_TEXT_LABEL)) {
+  if (persist_exists(MESSAGE_KEY_TEXT_LABEL) && persist_exists(MESSAGE_KEY_TEXT_LABEL)) {
     static char s_buffer[16];
-    persist_read_string(KEY_TEXT_LABEL, s_buffer, 16);
+    persist_read_string(MESSAGE_KEY_TEXT_LABEL, s_buffer, 16);
     text_layer_set_text(s_text_utc_offset_layer, s_buffer);
   }
   
-  if (persist_exists(KEY_STRING_UTC_OFFSET)) {    
-    utc_offset_int = persist_read_int(KEY_STRING_UTC_OFFSET);
+  if (persist_exists(MESSAGE_KEY_STRING_UTC_OFFSET)) {    
+    utc_offset_int = persist_read_int(MESSAGE_KEY_STRING_UTC_OFFSET);
     update_time();
   }
   
-  if (persist_exists(KEY_STRING_PRIMARY_FONT)) {
-    primary_font = persist_read_int(KEY_STRING_PRIMARY_FONT);
+  if (persist_exists(MESSAGE_KEY_STRING_PRIMARY_FONT)) {
+    primary_font = persist_read_int(MESSAGE_KEY_STRING_PRIMARY_FONT);
     updatePrimaryFont();
   }
   
-  if (persist_exists(KEY_STRING_SECONDARY_FONT)) {
-    secondary_font = persist_read_int(KEY_STRING_SECONDARY_FONT);
+  if (persist_exists(MESSAGE_KEY_STRING_SECONDARY_FONT)) {
+    secondary_font = persist_read_int(MESSAGE_KEY_STRING_SECONDARY_FONT);
     updateSecondaryFont();
   } 
 }
@@ -213,9 +249,9 @@ static void main_window_load(Window *window) {
   text_layer_set_text_alignment(s_text_utc_offset_layer, GTextAlignmentCenter);
   
   /// UTC Offset Time
-  s_time_utc_offset_layer = text_layer_create(GRect(0, 144, 46, 20));
+  s_time_utc_offset_layer = text_layer_create(GRect(0, 144, 66, 20));
   layer_set_hidden((Layer *) s_time_utc_offset_layer, true);
-  text_layer_set_text(s_time_layer, "00:00");
+  text_layer_set_text(s_time_utc_offset_layer, "00:00");
   text_layer_set_background_color(s_time_utc_offset_layer, GColorClear);
   text_layer_set_text_color(s_time_utc_offset_layer, GColorWhite);
   layer_add_child(window_layer, text_layer_get_layer(s_time_utc_offset_layer));
@@ -254,67 +290,70 @@ static void main_window_unload(Window *window) {
 }
 
 static void inbox_received_callback(DictionaryIterator *iter, void *context) {
-
-  Tuple *message_tuple = dict_find(iter, KEY_COLOR_BACKGROUND);
+  
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Message received");
+  
+  Tuple *message_tuple = dict_find(iter, MESSAGE_KEY_COLOR_BACKGROUND);
   if(message_tuple) {
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Background found");
     uint32_t background_int = message_tuple->value->int32;
     GColor background_color = GColorFromHEX(background_int);
-    persist_write_int(KEY_COLOR_BACKGROUND, background_int);
+    persist_write_int(MESSAGE_KEY_COLOR_BACKGROUND, background_int);
     
     updateBackgroundColor(background_color);  
   }
   
-  message_tuple = dict_find(iter, KEY_COLOR_PRIMARY);  
+  message_tuple = dict_find(iter, MESSAGE_KEY_COLOR_PRIMARY);  
   if(message_tuple) {
     uint32_t primary_int = message_tuple->value->int32;
     GColor primary_color = GColorFromHEX(primary_int);
-    persist_write_int(KEY_COLOR_PRIMARY, primary_int);
+    persist_write_int(MESSAGE_KEY_COLOR_PRIMARY, primary_int);
 
     updatePrimaryColor(primary_color);
   }  
   
   
-  message_tuple = dict_find(iter, KEY_COLOR_SECONDARY);  
+  message_tuple = dict_find(iter, MESSAGE_KEY_COLOR_SECONDARY);  
   if(message_tuple) {
     uint32_t secondary_int = message_tuple->value->int32;
     GColor secondary_color = GColorFromHEX(secondary_int);
-    persist_write_int(KEY_COLOR_SECONDARY, secondary_int);    
+    persist_write_int(MESSAGE_KEY_COLOR_SECONDARY, secondary_int);    
 
     updateSecondaryColor(secondary_color);
   }
   
-  message_tuple = dict_find(iter, KEY_TEXT_LABEL);  
+  message_tuple = dict_find(iter, MESSAGE_KEY_TEXT_LABEL);  
   if(message_tuple) {
     char *custom_label = message_tuple->value->cstring;
     static char s_buffer[16];
     snprintf(s_buffer, sizeof(s_buffer), "%s", custom_label);
-    persist_write_string(KEY_TEXT_LABEL, custom_label);    
+    persist_write_string(MESSAGE_KEY_TEXT_LABEL, custom_label);    
 
     updateUtcOffsetLabel(s_buffer);
   }
   
-  message_tuple = dict_find(iter, KEY_STRING_UTC_OFFSET);  
+  message_tuple = dict_find(iter, MESSAGE_KEY_STRING_UTC_OFFSET);  
   if(message_tuple) {
     char *offset = message_tuple->value->cstring;
     utc_offset_int = atoi(offset);
     
-    persist_write_int(KEY_STRING_UTC_OFFSET, utc_offset_int);
+    persist_write_int(MESSAGE_KEY_STRING_UTC_OFFSET, utc_offset_int);
   }
   
-  message_tuple = dict_find(iter, KEY_STRING_PRIMARY_FONT);  
+  message_tuple = dict_find(iter, MESSAGE_KEY_STRING_PRIMARY_FONT);  
   if(message_tuple) {
     char *font = message_tuple->value->cstring;
     primary_font = atoi(font);
-    persist_write_int(KEY_STRING_PRIMARY_FONT, primary_font);
+    persist_write_int(MESSAGE_KEY_STRING_PRIMARY_FONT, primary_font);
 
     updatePrimaryFont();
   }
   
-  message_tuple = dict_find(iter, KEY_STRING_SECONDARY_FONT);  
+  message_tuple = dict_find(iter, MESSAGE_KEY_STRING_SECONDARY_FONT);  
   if(message_tuple) {
     char *font = message_tuple->value->cstring;
     secondary_font = atoi(font);
-    persist_write_int(KEY_STRING_SECONDARY_FONT, secondary_font);
+    persist_write_int(MESSAGE_KEY_STRING_SECONDARY_FONT, secondary_font);
 
     updateSecondaryFont();
   }
